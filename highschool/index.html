@@ -1,0 +1,1548 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wrestling Scoreboard</title>
+
+  <style>
+    /* =========================================================
+       USER-TUNABLE TEXT STYLES (TOP) — change these only
+       ========================================================= */
+
+    /* colors applied to all "home/away" elements */
+    .home { color: #177a4b; }  /* green side */
+    .away { color: #b4232b; }  /* red side   */
+
+    /* main clock numbers */
+    .clock {
+      font-size: calc(var(--clockSize) * var(--D));
+      font-weight: 900;
+      letter-spacing: 2px;
+      line-height: 1;
+    }
+
+    /* team score (dual meet) */
+    .teamScore {
+      font-size: calc(var(--teamScoreSize) * var(--D));
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    /* match score (individual bout) */
+    .matchScore {
+      font-size: calc(var(--matchScoreSize) * var(--D));
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    /* period + weight big values */
+    .boutInfo {
+      font-size: calc(var(--boutInfoSize) * var(--D));
+      font-weight: 900;
+      line-height: 1;
+      color: #143a63;
+    }
+
+    /* small blood/injury timers */
+    .miniTimers {
+      font-size: calc(var(--miniTimerSize) * var(--D));
+      font-weight: 900;
+      line-height: 1.05;
+    }
+
+    /* popup blood/injury timers */
+    .popupTimers {
+      font-size: calc(var(--popupTimerSize) * var(--D));
+      font-weight: 900;
+      letter-spacing: 2px;
+      line-height: 1;
+    }
+
+    /* all button text (Pin/Tech/Major/Dec/+1/-1/T3/etc.) */
+    .buttons {
+      font-size: 16px;
+      font-weight: 950;
+      letter-spacing: .1px;
+    }
+
+    /* team + wrestler names */
+    .labels {
+      font-size: calc(var(--labelSize) * var(--D));
+      font-weight: 900;
+      letter-spacing: 1px;
+      line-height: 1.05;
+    }
+
+    /* hint under clock + small labels ("PERIOD", "WEIGHT CLASS", timer labels) */
+    .hintLabels {
+      font-size: calc(var(--hintLabelSize) * var(--D));
+      font-weight: 950;
+      letter-spacing: .25px;
+      color: #5c5c66;
+      text-transform: uppercase;
+    }
+
+    .rowSpacer{
+      margin-top: 10px;
+    }
+
+
+    /* =========================================================
+       NON-TUNABLE LAYOUT / CONTAINERS (below)
+       ========================================================= */
+    :root{
+      --bg:#fbfaf8;
+      --ink:#101018;
+      --muted:#5c5c66;
+      --card:#ffffff;
+      --border:#d8d8df;
+
+      --shadow: 0 10px 24px rgba(0,0,0,.08);
+      --radius:18px;
+
+      /* display scaling (computed in JS) */
+      --D: 1;
+      --clockSize: 240px;
+      --teamScoreSize: 200px;
+      --matchScoreSize: 200px;
+      --boutInfoSize: 100px;
+      --miniTimerSize: 60px;
+      --popupTimerSize: 160px;
+      --labelSize: 26px;
+      --hintLabelSize: 11px;
+    }
+
+    *{ box-sizing:border-box; }
+    html, body { height:100%; }
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--ink);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    }
+
+    /* IMPORTANT: remove default p margins so big numbers don't create "phantom padding" */
+    p{ margin:0; }
+
+    .wrap{
+      height: 100vh;
+      width: 100vw;
+      padding: 8px;
+      display:flex;
+      flex-direction:column;
+      gap: 8px;
+    }
+
+    .topbar{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      justify-content:space-between;
+      flex-wrap:wrap;
+    }
+
+    .brand{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      padding:8px 10px;
+      border:1px solid var(--border);
+      background:var(--card);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      user-select:none;
+      min-width: 240px;
+    }
+    .brand h1{ font-size:13px; margin:0; letter-spacing:.2px; }
+    .brand .sub{ font-size:11px; color:var(--muted); }
+
+    .menu{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .btn{
+      border:1px solid var(--border);
+      background:var(--card);
+      padding:8px 10px;
+      border-radius: 12px;
+      cursor:pointer;
+      color: var(--ink);
+      box-shadow: var(--shadow);
+      user-select:none;
+      white-space:nowrap;
+    }
+    .btn.primary{
+      border-color: rgba(42,39,110,.25);
+      background: linear-gradient(180deg, #fff, #f7f6ff);
+    }
+    .btn.warn{
+      border-color: rgba(180,35,43,.25);
+      background: linear-gradient(180deg, #fff, #fff5f5);
+    }
+    .btn.ghost{ box-shadow:none; background: transparent; }
+    .btn.tiny{ padding:6px 8px; border-radius:10px; }
+
+    .boardWrap{
+      flex: 1 1 auto;
+      display:grid;
+      grid-template-columns: 0.9fr 1.4fr 0.9fr;
+      gap:10px;
+      align-items:stretch;
+      min-height: 0;
+    }
+    @media (max-width: 1100px){
+      .boardWrap{ grid-template-columns: 1fr; }
+    }
+
+    .panel{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 10px;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      min-height: 0;
+
+      /* FIX for your screenshot "padding":
+         the old justify-content:center vertically centers the few elements,
+         leaving giant blank space above/below. */
+      justify-content:flex-start;
+    }
+
+    .teamHdr, .wrestlerBlk{ text-align:center; }
+    .divider{ height:1px; background: var(--border); margin: 10px 0; }
+
+    .teamScoreBtns, .miniRow, .twoRows{ margin-top: 8px; }
+    .teamScoreBtns{
+      display:flex; gap:6px; justify-content:center; flex-wrap:wrap;
+    }
+    .miniRow{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+    .twoRows{ display:grid; gap:6px; }
+    .twoRows .row{ display:grid; gap:6px; grid-template-columns: repeat(4, minmax(0,1fr)); }
+    .twoRows .row.three{ grid-template-columns: repeat(3, minmax(0,1fr)); }
+
+    .clockBox{
+      background:#000000;
+      border-radius: 18px;
+      border:1px solid rgba(0,0,0,.35);
+      padding: 14px 14px;
+      text-align:center;
+      box-shadow: 0 14px 26px rgba(0,0,0,.16);
+      user-select:none;
+      cursor:pointer;
+    }
+    .clockTime{ color: #ffd400; }
+
+    .clockHint{
+      text-align:center;
+      margin-top: 6px;
+    }
+
+    .midMeta{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:16px;
+    }
+    .metaCard{
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius: 16px;
+      padding: 10px 10px;
+      text-align:center;
+      box-shadow: var(--shadow);
+    }
+
+    .metaBig{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      gap:8px;
+    }
+
+    .stepBtn{
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background:#fff;
+      box-shadow: var(--shadow);
+      cursor:pointer;
+      font-weight: 900;
+      font-size: 20px;
+      line-height: 1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      user-select:none;
+      flex: 0 0 auto;
+    }
+
+    .midBottomTimers{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:8px;
+    }
+    .miniTimer{
+      border:1px solid var(--border);
+      border-radius: 16px;
+      padding: 8px;
+      background:#fff;
+      text-align:center;
+      cursor:pointer;
+      user-select:none;
+      box-shadow: var(--shadow);
+    }
+    .miniTimer .lbl{ margin-top: 4px; }
+
+    .logBar{
+      background: var(--card);
+      border:1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 8px 10px;
+      min-height: 44px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      overflow:hidden;
+    }
+    .logTitle{
+      font-weight: 900;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing:.25px;
+      white-space:nowrap;
+    }
+    .logStream{
+      flex: 1 1 auto;
+      overflow:hidden;
+      white-space:nowrap;
+      text-overflow: ellipsis;
+      font-size: 13px;
+    }
+    .logStream .pTag{ font-weight: 900; color:#111; margin-right: 6px; }
+    .logStream .evt{ font-weight: 900; margin-right: 6px; }
+
+    /* Modals */
+    .modalBackdrop{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.38);
+      display:none; align-items:center; justify-content:center;
+      padding:16px; z-index:60;
+    }
+    .modalBackdrop.show{ display:flex; }
+
+    .modal{
+      width:min(1100px, 100%);
+      max-height: 92vh;
+      overflow:auto;
+      background: var(--card);
+      border:1px solid var(--border);
+      border-radius: 22px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.2);
+      padding: 14px;
+    }
+    .modalHead{
+      display:flex; align-items:flex-start; justify-content:space-between;
+      gap:10px; margin-bottom: 8px;
+    }
+    .modalHead h2{ margin:0; font-size: 16px; font-weight: 900; }
+
+    .twoCol{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    @media (max-width: 900px){ .twoCol{ grid-template-columns: 1fr; } }
+
+    label{ font-size:12px; color:var(--muted); display:block; margin-bottom:4px; font-weight:900;}
+    input, select, textarea{
+      width:100%;
+      padding:10px 10px;
+      border-radius: 12px;
+      border:1px solid var(--border);
+      background:#fff;
+      color: var(--ink);
+      font-size: 14px;
+      outline:none;
+    }
+    textarea{ min-height: 110px; resize:vertical; }
+
+    .sectionTitle{
+      font-weight: 900;
+      font-size: 12px;
+      letter-spacing:.25px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin: 0 0 8px;
+    }
+    .dividerThin{ height:1px; background: var(--border); margin: 10px 0; }
+
+    .tableWrap{
+      border:1px solid var(--border);
+      border-radius: 14px;
+      overflow:hidden;
+      background:#fff;
+    }
+    table{ width:100%; border-collapse:collapse; font-size: 13px; }
+    th, td{ padding:8px 10px; border-bottom:1px solid rgba(0,0,0,.06); vertical-align:middle; }
+    th{
+      text-align:left; font-size: 12px; color: var(--muted); font-weight: 900;
+      background: linear-gradient(180deg, #fff, #fbfbff);
+    }
+    tr:last-child td{ border-bottom:none; }
+    .wcol{ width: 76px; font-weight: 900; }
+    .cellInput{
+      width:100%;
+      padding:8px 8px;
+      border-radius: 10px;
+      border:1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .bigTimerCard{
+      width:min(760px, 100%);
+      background: #fff;
+      border:1px solid var(--border);
+      border-radius: 22px;
+      box-shadow: 0 26px 80px rgba(0,0,0,.25);
+      padding: 16px;
+    }
+    .bigTimerHdr{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom: 10px; }
+    .bigTimerHdr .title{ font-weight: 900; font-size: 16px; letter-spacing:.2px; text-transform: uppercase; }
+    .bigTime{ text-align:center; margin: 8px 0 6px; }
+    .bigTimerHint{ text-align:center; font-weight: 900; color: var(--muted); font-size: 12px; }
+    .bigTimerBtns{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top: 12px; }
+    .bigTimerBtns .btn{ min-width: 120px; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div>
+          <h1>Wrestling Scoreboard</h1>
+          <div class="sub">Big display • Controls stay small</div>
+        </div>
+      </div>
+
+      <div class="menu">
+        <button class="btn primary buttons" id="btnPrevMatch">Prev Match</button>
+        <button class="btn primary buttons" id="btnNextMatch">Next Match</button>
+        <button class="btn buttons" id="btnSetTime">Set Time</button>
+
+        <span style="width:6px;"></span>
+
+        <button class="btn primary buttons" id="btnFullscreen">Fullscreen</button>
+        <button class="btn buttons" id="btnSetup">Setup</button>
+        <button class="btn buttons" id="btnConfig">Config</button>
+        <button class="btn buttons" id="btnExportConfig">Export Config</button>
+        <button class="btn buttons" id="btnImportConfig">Import Config</button>
+        <button class="btn warn buttons" id="btnResetBout">Reset Bout</button>
+        <button class="btn warn buttons" id="btnResetMatch">Reset Match</button>
+      </div>
+    </div>
+
+    <div class="boardWrap">
+      <!-- AWAY (RED) LEFT -->
+      <div class="panel">
+        <div class="teamHdr">
+          <p class="labels away" id="team1NameTop">TEAM 1</p>
+          <p class="teamScore away" id="team1TeamScoreTop">0</p>
+          <div class="teamScoreBtns">
+            <button class="btn tiny buttons" data-action="teampts" data-team="team1" data-type="Fall">Pin</button>
+            <button class="btn tiny buttons" data-action="teampts" data-team="team1" data-type="Tech">Tech</button>
+            <button class="btn tiny buttons" data-action="teampts" data-team="team1" data-type="Major">Major</button>
+            <button class="btn tiny buttons" data-action="teampts" data-team="team1" data-type="Decision">Dec</button>
+            <button class="btn tiny buttons" data-action="teamadj" data-team="team1" data-delta="1">+1</button>
+            <button class="btn tiny buttons" data-action="teamadj" data-team="team1" data-delta="-1">−1</button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="wrestlerBlk">
+          <p class="labels away" id="team1WrestlerName">—</p>
+          <p class="matchScore away" id="team1MatchScore">0</p>
+
+          <div class="miniRow">
+            <button class="btn tiny buttons" data-action="matchadj" data-side="team1" data-delta="-1">−1</button>
+            <button class="btn tiny buttons" data-action="matchadj" data-side="team1" data-delta="1">+1</button>
+          </div>
+
+          <div class="twoRows" id="team1MatchBtns"></div>
+        </div>
+      </div>
+
+      <!-- MIDDLE -->
+      <div class="panel">
+        <div class="clockBox" id="clockBox" title="Click to start/stop">
+          <p class="clockTime clock" id="mainClock">2:00</p>
+        </div>
+        <div class="clockHint hintLabels">Start / Stop by clicking the clock or pressing Space</div>
+
+        <div class="midMeta rowSpacer">
+          <div class="metaCard">
+            <div class="metaBig">
+              <button class="stepBtn buttons" id="btnPeriodDown" aria-label="Previous period">−</button>
+              <span class="boutInfo" id="periodBig">1</span>
+              <button class="stepBtn buttons" id="btnPeriodUp" aria-label="Next period">+</button>
+            </div>
+            <div class="hintLabels">Period</div>
+          </div>
+
+          <div class="metaCard">
+            <div class="metaBig">
+              <span class="boutInfo" id="weightBig">106</span>
+            </div>
+            <div class="hintLabels">Weight Class</div>
+          </div>
+        </div>
+
+        <div class="midBottomTimers rowSpacer">
+          <div class="miniTimer" data-timer="blood1">
+            <p class="t miniTimers away" id="blood1Text">5:00</p>
+            <div class="lbl hintLabels">Blood Time</div>
+          </div>
+          <div class="miniTimer" data-timer="blood2">
+            <p class="t miniTimers home" id="blood2Text">5:00</p>
+            <div class="lbl hintLabels">Blood Time</div>
+          </div>
+          <div class="miniTimer" data-timer="injury1">
+            <p class="t miniTimers away" id="injury1Text">1:30</p>
+            <div class="lbl hintLabels">Injury Time</div>
+          </div>
+          <div class="miniTimer" data-timer="injury2">
+            <p class="t miniTimers home" id="injury2Text">1:30</p>
+            <div class="lbl hintLabels">Injury Time</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HOME (GREEN) RIGHT -->
+      <div class="panel">
+        <div class="teamHdr">
+          <p class="labels home" id="team2NameTop">TEAM 2</p>
+          <p class="teamScore home" id="team2TeamScoreTop">0</p>
+          <div class="teamScoreBtns">
+            <button class="btn tiny buttons" data-action="teampts" data-team="team2" data-type="Fall">Pin</button>
+            <button class="btn tiny buttons" data-action="teampts" data-team="team2" data-type="Tech">Tech</button>
+            <button class="btn tiny buttons" data-action="teampts" data-team="team2" data-type="Major">Major</button>
+            <button class="btn tiny buttons" data-action="teampts" data-team="team2" data-type="Decision">Dec</button>
+            <button class="btn tiny buttons" data-action="teamadj" data-team="team2" data-delta="1">+1</button>
+            <button class="btn tiny buttons" data-action="teamadj" data-team="team2" data-delta="-1">−1</button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="wrestlerBlk">
+          <p class="labels home" id="team2WrestlerName">—</p>
+          <p class="matchScore home" id="team2MatchScore">0</p>
+
+          <div class="miniRow">
+            <button class="btn tiny buttons" data-action="matchadj" data-side="team2" data-delta="-1">−1</button>
+            <button class="btn tiny buttons" data-action="matchadj" data-side="team2" data-delta="1">+1</button>
+          </div>
+
+          <div class="twoRows" id="team2MatchBtns"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="logBar">
+      <div class="logTitle">SCORE LOG</div>
+      <div class="logStream" id="logStream"></div>
+      <button class="btn tiny buttons" id="btnClearLog">Clear</button>
+    </div>
+  </div>
+
+  <!-- SETUP MODAL -->
+  <div class="modalBackdrop" id="setupBackdrop" role="dialog" aria-modal="true" aria-label="Setup">
+    <div class="modal">
+      <div class="modalHead">
+        <h2>Setup (Lineup)</h2>
+        <button class="btn ghost buttons" id="btnCloseSetup">✕</button>
+      </div>
+
+      <div class="twoCol">
+        <div class="panel" style="box-shadow:none;">
+          <div class="sectionTitle">Teams</div>
+          <div class="twoCol" style="grid-template-columns: 1fr 1fr;">
+            <div>
+              <label class="away" for="setupTeam1">Team 1 name</label>
+              <input id="setupTeam1" placeholder="TEAM 1" />
+            </div>
+            <div>
+              <label class="home" for="setupTeam2">Team 2 name</label>
+              <input id="setupTeam2" placeholder="TEAM 2" />
+            </div>
+          </div>
+
+          <div class="dividerThin"></div>
+
+          <div class="sectionTitle">Starting / current match</div>
+          <div class="twoCol" style="grid-template-columns: 1fr 1fr;">
+            <div>
+              <label for="setupStartWeight">Start at weight</label>
+              <select id="setupStartWeight"></select>
+            </div>
+            <div>
+              <label for="setupCurrentWeight">Current weight (on apply)</label>
+              <select id="setupCurrentWeight"></select>
+            </div>
+          </div>
+
+          <div class="dividerThin"></div>
+
+          <div class="sectionTitle">Bulk paste (optional)</div>
+          <label for="bulkPaste">Paste: 106, Joe, Elijah</label>
+          <textarea id="bulkPaste" placeholder="106, Joe, Elijah&#10;113, Ryan Smith, Bob Jones"></textarea>
+          <div class="dividerThin"></div>
+          <button class="btn buttons" id="btnApplyBulk">Apply bulk paste to grid</button>
+        </div>
+
+        <div class="panel" style="box-shadow:none;">
+          <div class="sectionTitle">Lineup grid</div>
+          <div class="tableWrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="wcol">WT</th>
+                  <th class="away" id="setupTh1">TEAM1</th>
+                  <th class="home" id="setupTh2">TEAM2</th>
+                </tr>
+              </thead>
+              <tbody id="setupLineupBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="dividerThin"></div>
+      <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
+        <button class="btn buttons" id="btnSetupCancel">Cancel</button>
+        <button class="btn primary buttons" id="btnSetupApply">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIG MODAL -->
+  <div class="modalBackdrop" id="configBackdrop" role="dialog" aria-modal="true" aria-label="Config">
+    <div class="modal">
+      <div class="modalHead">
+        <h2>Config</h2>
+        <button class="btn ghost buttons" id="btnCloseConfig">✕</button>
+      </div>
+
+      <div class="twoCol">
+        <div class="panel" style="box-shadow:none;">
+          <div class="sectionTitle">Match scoring (points)</div>
+          <div class="twoCol" style="grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px;">
+            <div><label for="cfgTD">Takedown (T3)</label><input id="cfgTD" type="number" step="1" /></div>
+            <div><label for="cfgE1">Escape (E1)</label><input id="cfgE1" type="number" step="1" /></div>
+            <div><label for="cfgR2">Reversal (R2)</label><input id="cfgR2" type="number" step="1" /></div>
+            <div><label for="cfgP1">Penalty (P1)</label><input id="cfgP1" type="number" step="1" /></div>
+            <div><label for="cfgNF2">Near-fall 2 (NF2)</label><input id="cfgNF2" type="number" step="1" /></div>
+            <div><label for="cfgNF3">Near-fall 3 (NF3)</label><input id="cfgNF3" type="number" step="1" /></div>
+            <div><label for="cfgNF4">Near-fall 4 (NF4)</label><input id="cfgNF4" type="number" step="1" /></div>
+          </div>
+        </div>
+
+        <div class="panel" style="box-shadow:none;">
+          <div class="sectionTitle">Team points by result</div>
+          <div class="twoCol" style="grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px;">
+            <div><label for="cfgDecision">Decision</label><input id="cfgDecision" type="number" step="1" /></div>
+            <div><label for="cfgMajor">Major</label><input id="cfgMajor" type="number" step="1" /></div>
+            <div><label for="cfgTech">Tech</label><input id="cfgTech" type="number" step="1" /></div>
+            <div><label for="cfgFall">Fall (Pin)</label><input id="cfgFall" type="number" step="1" /></div>
+          </div>
+
+          <div class="dividerThin"></div>
+
+          <div class="sectionTitle">Aux timer defaults</div>
+          <div class="twoCol" style="grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px;">
+            <div><label for="cfgBlood">Blood Time (mm:ss)</label><input id="cfgBlood" value="5:00" /></div>
+            <div><label for="cfgInjury">Injury Time (mm:ss)</label><input id="cfgInjury" value="1:30" /></div>
+          </div>
+
+          <div class="dividerThin"></div>
+
+          <div class="sectionTitle">Text sizes (px)</div>
+          <div class="twoCol" style="grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px;">
+            <div><label for="cfgClockSize">Clock</label><input id="cfgClockSize" type="number" step="1" /></div>
+            <div><label for="cfgTeamScoreSize">Team score</label><input id="cfgTeamScoreSize" type="number" step="1" /></div>
+            <div><label for="cfgMatchScoreSize">Match score</label><input id="cfgMatchScoreSize" type="number" step="1" /></div>
+            <div><label for="cfgBoutInfoSize">Period / weight</label><input id="cfgBoutInfoSize" type="number" step="1" /></div>
+            <div><label for="cfgMiniTimerSize">Mini timers</label><input id="cfgMiniTimerSize" type="number" step="1" /></div>
+            <div><label for="cfgPopupTimerSize">Popup timers</label><input id="cfgPopupTimerSize" type="number" step="1" /></div>
+            <div><label for="cfgLabelSize">Team / wrestler names</label><input id="cfgLabelSize" type="number" step="1" /></div>
+            <div><label for="cfgHintLabelSize">Hint labels</label><input id="cfgHintLabelSize" type="number" step="1" /></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dividerThin"></div>
+      <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
+        <button class="btn buttons" id="btnConfigDefaults">Restore Defaults</button>
+        <button class="btn primary buttons" id="btnSaveConfig">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMPORT CONFIG MODAL -->
+  <div class="modalBackdrop" id="importBackdrop" role="dialog" aria-modal="true" aria-label="Import Config">
+    <div class="modal">
+      <div class="modalHead">
+        <h2>Import Config</h2>
+        <button class="btn ghost buttons" id="btnCloseImport">✕</button>
+      </div>
+      <div class="dividerThin"></div>
+      <textarea id="importText" placeholder='{"setup":...,"config":...}' style="min-height:220px; width:100%; padding:10px; border-radius:14px; border:1px solid var(--border);"></textarea>
+      <div class="dividerThin"></div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button class="btn primary buttons" id="btnDoImport">Import</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BIG TIMER MODAL -->
+  <div class="modalBackdrop" id="bigTimerBackdrop" role="dialog" aria-modal="true" aria-label="Timer">
+    <div class="bigTimerCard">
+      <div class="bigTimerHdr">
+        <div class="title" id="bigTimerTitle">TIMER</div>
+        <button class="btn ghost buttons" id="btnBigTimerClose">✕</button>
+      </div>
+      <div class="bigTime popupTimers" id="bigTimerTime">0:00</div>
+      <div class="bigTimerHint">Countdown. Close saves current value back to the small timer.</div>
+      <div class="bigTimerBtns">
+        <button class="btn primary buttons" id="btnBigTimerStartStop">Stop</button>
+        <button class="btn buttons" id="btnBigTimerSet">Set</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const STORAGE_KEY = "wrestle_scoreboard_v2";
+
+  const WEIGHTS = [106,113,120,126,132,138,144,150,157,165,175,190,215,285];
+  const PERIODS = [
+    { id:"P1",  label:"1",   ms: 2*60*1000 },
+    { id:"P2",  label:"2",   ms: 2*60*1000 },
+    { id:"P3",  label:"3",   ms: 2*60*1000 },
+    { id:"SV1", label:"SV1", ms: 1*60*1000 },
+    { id:"TB1", label:"TB1", ms: 30*1000 },
+    { id:"TB2", label:"TB2", ms: 30*1000 },
+    { id:"UTB", label:"UTB", ms: 30*1000 },
+  ];
+
+  const parseMmSs = (s, fallbackMs) => {
+    const m = String(s||"").trim().match(/^(\d+):([0-5]\d)$/);
+    if(!m) return fallbackMs;
+    return (parseInt(m[1],10)*60 + parseInt(m[2],10))*1000;
+  };
+  const fmtMs = (ms) => {
+    ms = Math.max(0, Math.round(ms));
+    const total = Math.floor(ms/1000);
+    const m = Math.floor(total/60);
+    const s = total%60;
+    return `${m}:${String(s).padStart(2,"0")}`;
+  };
+  const deepCopy = (obj) => JSON.parse(JSON.stringify(obj));
+  const escapeHtml = (s) =>
+    String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  const escapeAttr = (s) =>
+    String(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+  const DEFAULT_TEXT_SIZES = {
+    clock: 240,
+    teamScore: 200,
+    matchScore: 200,
+    boutInfo: 100,
+    miniTimers: 60,
+    popupTimers: 160,
+    labels: 26,
+    hintLabels: 11
+  };
+
+  const defaultConfig = () => ({
+    scoring: { TD:3, E1:1, R2:2, P1:1, NF2:2, NF3:3, NF4:4 },
+    teamPoints: { Decision:3, Major:4, Tech:5, Fall:6 },
+    auxDefaults: { bloodMs: 5*60*1000, injuryMs: 90*1000 },
+    textSizes: { ...DEFAULT_TEXT_SIZES }
+  });
+  const defaultLineup = () => {
+    const l = {};
+    WEIGHTS.forEach(w => l[w] = { team1:"", team2:"" });
+    return l;
+  };
+
+  const initialState = () => ({
+    setup: { team1Name:"TEAM 1", team2Name:"TEAM 2", currentWeight:106, startWeight:106, lineup: defaultLineup() },
+    config: defaultConfig(),
+    match: { running:false, periodIndex:0, remainingMs: PERIODS[0].ms, team1Match:0, team2Match:0, team1Team:0, team2Team:0 },
+    auxTimers: {
+      blood1: { label:"Blood Time (Away)", css:"away", remainingMs: 5*60*1000 },
+      injury1:{ label:"Injury Time (Away)", css:"away", remainingMs: 90*1000 },
+      injury2:{ label:"Injury Time (Home)", css:"home", remainingMs: 90*1000 },
+      blood2: { label:"Blood Time (Home)", css:"home", remainingMs: 5*60*1000 },
+    },
+    scoreLog: { items: [] }
+  });
+
+  let state = initialState();
+
+  let mainTick=null, lastMainAt=null;
+  let bigTick=null, lastBigAt=null, activeTimerKey=null, bigRunning=false;
+  let saveTimer=null;
+
+  const el = (id) => document.getElementById(id);
+
+  function computeDisplayScale(){
+    const h = window.innerHeight || 1200;
+    let D = (h / 1200) * 1.10;
+    D = Math.max(1.05, Math.min(1.85, D));
+    if(h < 900) D = Math.min(D, 1.15);
+    document.documentElement.style.setProperty("--D", String(D.toFixed(3)));
+  }
+  computeDisplayScale();
+  window.addEventListener("resize", computeDisplayScale);
+
+  function applyTextSizesFromConfig(){
+    const sizes = { ...DEFAULT_TEXT_SIZES, ...(state.config.textSizes || {}) };
+    const clampSize = (val, fallback) => {
+      const n = parseFloat(val);
+      return Number.isFinite(n) ? Math.max(8, n) : fallback;
+    };
+    const root = document.documentElement;
+    root.style.setProperty("--clockSize", `${clampSize(sizes.clock, DEFAULT_TEXT_SIZES.clock)}px`);
+    root.style.setProperty("--teamScoreSize", `${clampSize(sizes.teamScore, DEFAULT_TEXT_SIZES.teamScore)}px`);
+    root.style.setProperty("--matchScoreSize", `${clampSize(sizes.matchScore, DEFAULT_TEXT_SIZES.matchScore)}px`);
+    root.style.setProperty("--boutInfoSize", `${clampSize(sizes.boutInfo, DEFAULT_TEXT_SIZES.boutInfo)}px`);
+    root.style.setProperty("--miniTimerSize", `${clampSize(sizes.miniTimers, DEFAULT_TEXT_SIZES.miniTimers)}px`);
+    root.style.setProperty("--popupTimerSize", `${clampSize(sizes.popupTimers, DEFAULT_TEXT_SIZES.popupTimers)}px`);
+    root.style.setProperty("--labelSize", `${clampSize(sizes.labels, DEFAULT_TEXT_SIZES.labels)}px`);
+    root.style.setProperty("--hintLabelSize", `${clampSize(sizes.hintLabels, DEFAULT_TEXT_SIZES.hintLabels)}px`);
+  }
+
+  function applyTextSizesFromInputs(){
+    const clampSize = (id, fallback) => {
+      const n = parseFloat(el(id).value);
+      return Number.isFinite(n) ? Math.max(8, n) : fallback;
+    };
+    const root = document.documentElement;
+    root.style.setProperty("--clockSize", `${clampSize("cfgClockSize", DEFAULT_TEXT_SIZES.clock)}px`);
+    root.style.setProperty("--teamScoreSize", `${clampSize("cfgTeamScoreSize", DEFAULT_TEXT_SIZES.teamScore)}px`);
+    root.style.setProperty("--matchScoreSize", `${clampSize("cfgMatchScoreSize", DEFAULT_TEXT_SIZES.matchScore)}px`);
+    root.style.setProperty("--boutInfoSize", `${clampSize("cfgBoutInfoSize", DEFAULT_TEXT_SIZES.boutInfo)}px`);
+    root.style.setProperty("--miniTimerSize", `${clampSize("cfgMiniTimerSize", DEFAULT_TEXT_SIZES.miniTimers)}px`);
+    root.style.setProperty("--popupTimerSize", `${clampSize("cfgPopupTimerSize", DEFAULT_TEXT_SIZES.popupTimers)}px`);
+    root.style.setProperty("--labelSize", `${clampSize("cfgLabelSize", DEFAULT_TEXT_SIZES.labels)}px`);
+    root.style.setProperty("--hintLabelSize", `${clampSize("cfgHintLabelSize", DEFAULT_TEXT_SIZES.hintLabels)}px`);
+  }
+
+  function scheduleSave(quiet){
+    if(saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){}
+    }, quiet ? 450 : 200);
+  }
+
+  function loadSaved(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return;
+      const obj = JSON.parse(raw);
+      if(!obj || typeof obj !== "object") return;
+
+      const fresh = initialState();
+      state = {
+        ...fresh,
+        ...obj,
+        setup: { ...fresh.setup, ...(obj.setup||{}), lineup: { ...fresh.setup.lineup, ...((obj.setup||{}).lineup||{}) } },
+        config: {
+          ...fresh.config,
+          ...(obj.config||{}),
+          scoring: { ...fresh.config.scoring, ...((obj.config||{}).scoring||{}) },
+          teamPoints: { ...fresh.config.teamPoints, ...((obj.config||{}).teamPoints||{}) },
+          auxDefaults: { ...fresh.config.auxDefaults, ...((obj.config||{}).auxDefaults||{}) },
+          textSizes: { ...fresh.config.textSizes, ...((obj.config||{}).textSizes||{}) }
+        },
+        match: { ...fresh.match, ...(obj.match||{}) },
+        auxTimers: { ...fresh.auxTimers, ...(obj.auxTimers||{}) },
+        scoreLog: { ...fresh.scoreLog, ...(obj.scoreLog||{}) }
+      };
+
+      if(!WEIGHTS.includes(state.setup.currentWeight)) state.setup.currentWeight = 106;
+      if(!WEIGHTS.includes(state.setup.startWeight)) state.setup.startWeight = state.setup.currentWeight;
+
+      if(typeof state.match.periodIndex !== "number" || state.match.periodIndex < 0 || state.match.periodIndex >= PERIODS.length){
+        state.match.periodIndex = 0;
+        state.match.remainingMs = PERIODS[0].ms;
+      }
+      if(!Array.isArray(state.scoreLog.items)) state.scoreLog.items = [];
+      state.match.running = false;
+      lastMainAt = null;
+    } catch(e){}
+  }
+
+  const clamp0 = (n)=> Math.max(0, n|0);
+  const currentWeightIndex = ()=> WEIGHTS.indexOf(state.setup.currentWeight);
+
+  function resetAuxTimersToDefaults(){
+    const b = state.config.auxDefaults.bloodMs;
+    const i = state.config.auxDefaults.injuryMs;
+    state.auxTimers.blood1.remainingMs = b;
+    state.auxTimers.blood2.remainingMs = b;
+    state.auxTimers.injury1.remainingMs = i;
+    state.auxTimers.injury2.remainingMs = i;
+  }
+
+  function renderLog(){
+    el("logStream").innerHTML = state.scoreLog.items.slice(-60).join(" ");
+  }
+  function logAdd(html){
+    state.scoreLog.items.push(html);
+    if(state.scoreLog.items.length > 180) state.scoreLog.items.splice(0, state.scoreLog.items.length - 180);
+    renderLog();
+    scheduleSave(true);
+  }
+  function logStartMatch(){ logAdd(`<span class="pTag">[1]</span>`); }
+  function logPeriodChange(idx){
+    const lbl = PERIODS[idx]?.label ?? "?";
+    logAdd(`<span class="pTag">[${escapeHtml(lbl)}]</span>`);
+  }
+  function logScoreEvent(side, label){
+    const cls = (side === "team1") ? "away" : "home";
+    logAdd(`<span class="evt ${cls}"><b>${escapeHtml(label)}</b></span>`);
+  }
+
+  function stopMainClock(){
+    state.match.running = false;
+    lastMainAt = null;
+    if(mainTick){ clearInterval(mainTick); mainTick=null; }
+    scheduleSave(true);
+    el("mainClock").textContent = fmtMs(state.match.remainingMs);
+  }
+  function startMainClock(){
+    if(state.match.running) return;
+    state.match.running = true;
+    lastMainAt = performance.now();
+    mainTick = setInterval(() => {
+      if(!state.match.running) return;
+      const now = performance.now();
+      const dt = Math.max(0, now - (lastMainAt ?? now));
+      lastMainAt = now;
+
+      state.match.remainingMs = Math.max(0, state.match.remainingMs - dt);
+      if(state.match.remainingMs <= 0){
+        state.match.remainingMs = 0;
+        stopMainClock();
+      }
+      el("mainClock").textContent = fmtMs(state.match.remainingMs);
+      scheduleSave(true);
+    }, 100);
+    scheduleSave(true);
+  }
+  function toggleMainClock(){ state.match.running ? stopMainClock() : startMainClock(); }
+
+  function resetMatchForNewWeight(){
+    state.match.team1Match = 0;
+    state.match.team2Match = 0;
+    state.match.periodIndex = 0;
+    state.match.remainingMs = PERIODS[0].ms;
+    stopMainClock();
+    resetAuxTimersToDefaults();
+    logStartMatch();
+  }
+
+  function confirmMove(which){
+    return confirm(`${which} will reset bout clock, period, match points, blood/injury timers, and start a new score log section. Team score stays. Continue?`);
+  }
+  function confirmFullReset(){
+    return confirm("Reset match will reset bout clock, period, match points, blood/injury timers, team scores, and clear team/wrestler names. Continue?");
+  }
+
+  function setCurrentWeight(w){
+    if(!WEIGHTS.includes(w)) return;
+    state.setup.currentWeight = w;
+    resetMatchForNewWeight();
+    scheduleSave();
+    render();
+  }
+  function gotoNextMatch(){
+    if(!confirmMove("Next match")) return;
+    clearScoreLog();
+    setCurrentWeight(WEIGHTS[(currentWeightIndex() + 1) % WEIGHTS.length]);
+  }
+  function gotoPrevMatch(){
+    if(!confirmMove("Prev match")) return;
+    clearScoreLog();
+    setCurrentWeight(WEIGHTS[(currentWeightIndex() - 1 + WEIGHTS.length) % WEIGHTS.length]);
+  }
+
+  function setMainTimePrompt(){
+    const current = fmtMs(state.match.remainingMs);
+    const input = prompt("Set main clock (mm:ss)", current);
+    if(input == null) return;
+    const ms = parseMmSs(input, null);
+    if(ms == null){ alert("Invalid format. Use mm:ss (e.g., 2:00)."); return; }
+    state.match.remainingMs = ms;
+    stopMainClock();
+    scheduleSave();
+    render();
+  }
+
+  function setPeriodIndex(idx){
+    idx = Math.max(0, Math.min(PERIODS.length-1, idx));
+    if(idx === state.match.periodIndex) return;
+    state.match.periodIndex = idx;
+    state.match.remainingMs = PERIODS[idx].ms;
+    stopMainClock();
+    logPeriodChange(idx);
+    scheduleSave();
+    render();
+  }
+  function periodDown(){ setPeriodIndex(state.match.periodIndex - 1); }
+  function periodUp(){ setPeriodIndex(state.match.periodIndex + 1); }
+
+  function renderMatchButtons(){
+    const row1 = [
+      { k:"TD", label:"T3" },
+      { k:"E1", label:"E1" },
+      { k:"R2", label:"R2" },
+      { k:"P1", label:"P1" },
+    ];
+    const row2 = [
+      { k:"NF2", label:"NF2" },
+      { k:"NF3", label:"NF3" },
+      { k:"NF4", label:"NF4" },
+    ];
+
+    const html = (side) => `
+      <div class="row">
+        ${row1.map(x => `<button class="btn tiny buttons" data-action="matchkey" data-side="${side}" data-key="${x.k}" data-label="${x.label}">${x.label}</button>`).join("")}
+      </div>
+      <div class="row three">
+        ${row2.map(x => `<button class="btn tiny buttons" data-action="matchkey" data-side="${side}" data-key="${x.k}" data-label="${x.label}">${x.label}</button>`).join("")}
+      </div>
+    `;
+    el("team1MatchBtns").innerHTML = html("team1");
+    el("team2MatchBtns").innerHTML = html("team2");
+  }
+
+  function renderAuxTimers(){
+    el("blood1Text").textContent = fmtMs(state.auxTimers.blood1.remainingMs);
+    el("injury1Text").textContent = fmtMs(state.auxTimers.injury1.remainingMs);
+    el("injury2Text").textContent = fmtMs(state.auxTimers.injury2.remainingMs);
+    el("blood2Text").textContent = fmtMs(state.auxTimers.blood2.remainingMs);
+  }
+
+  function openBigTimer(timerKey){
+    stopMainClock();
+    activeTimerKey = timerKey;
+    const t = state.auxTimers[timerKey];
+    if(!t) return;
+
+    if(bigTick){ clearInterval(bigTick); bigTick = null; }
+    lastBigAt = null;
+
+    el("bigTimerTitle").textContent = t.label.toUpperCase();
+    el("bigTimerTime").textContent = fmtMs(t.remainingMs);
+    el("bigTimerTime").classList.remove("home","away");
+    el("bigTimerTime").classList.add(t.css);
+
+    bigRunning = true;
+    el("btnBigTimerStartStop").textContent = "Stop";
+    lastBigAt = performance.now();
+    bigTick = setInterval(() => {
+      if(!activeTimerKey || !bigRunning) return;
+      const timer = state.auxTimers[activeTimerKey];
+      const now = performance.now();
+      const dt = Math.max(0, now - (lastBigAt ?? now));
+      lastBigAt = now;
+
+      timer.remainingMs = Math.max(0, timer.remainingMs - dt);
+      el("bigTimerTime").textContent = fmtMs(timer.remainingMs);
+      renderAuxTimers();
+      scheduleSave(true);
+
+      if(timer.remainingMs <= 0){
+        timer.remainingMs = 0;
+        bigRunning = false;
+        clearInterval(bigTick); bigTick = null;
+        el("btnBigTimerStartStop").textContent = "Start";
+      }
+    }, 100);
+
+    el("bigTimerBackdrop").classList.add("show");
+  }
+
+  function closeBigTimer(){
+    bigRunning = false;
+    lastBigAt = null;
+    if(bigTick){ clearInterval(bigTick); bigTick = null; }
+    el("bigTimerBackdrop").classList.remove("show");
+    activeTimerKey = null;
+    scheduleSave(true);
+    renderAuxTimers();
+  }
+
+  function toggleBigTimer(){
+    if(!activeTimerKey) return;
+    if(bigRunning){
+      bigRunning = false;
+      el("btnBigTimerStartStop").textContent = "Start";
+      if(bigTick){ clearInterval(bigTick); bigTick = null; }
+      lastBigAt = null;
+    } else {
+      bigRunning = true;
+      el("btnBigTimerStartStop").textContent = "Stop";
+      lastBigAt = performance.now();
+      if(bigTick) clearInterval(bigTick);
+      bigTick = setInterval(() => {
+        if(!activeTimerKey || !bigRunning) return;
+        const timer = state.auxTimers[activeTimerKey];
+        const now = performance.now();
+        const dt = Math.max(0, now - (lastBigAt ?? now));
+        lastBigAt = now;
+
+        timer.remainingMs = Math.max(0, timer.remainingMs - dt);
+        el("bigTimerTime").textContent = fmtMs(timer.remainingMs);
+        renderAuxTimers();
+        scheduleSave(true);
+
+        if(timer.remainingMs <= 0){
+          timer.remainingMs = 0;
+          bigRunning = false;
+          clearInterval(bigTick); bigTick = null;
+          el("btnBigTimerStartStop").textContent = "Start";
+        }
+      }, 100);
+    }
+  }
+
+  function setBigTimerPrompt(){
+    if(!activeTimerKey) return;
+    const t = state.auxTimers[activeTimerKey];
+    const current = fmtMs(t.remainingMs);
+    const input = prompt("Set timer (mm:ss)", current);
+    if(input == null) return;
+    const ms = parseMmSs(input, null);
+    if(ms == null){ alert("Invalid format. Use mm:ss."); return; }
+    t.remainingMs = ms;
+    el("bigTimerTime").textContent = fmtMs(t.remainingMs);
+    renderAuxTimers();
+    scheduleSave(true);
+  }
+
+  // Setup modal (draft + apply)
+  let setupDraft = null;
+
+  function openSetup(){
+    setupDraft = deepCopy(state.setup);
+    el("setupTeam1").value = setupDraft.team1Name || "";
+    el("setupTeam2").value = setupDraft.team2Name || "";
+    el("setupStartWeight").innerHTML = WEIGHTS.map(w => `<option value="${w}">${w}</option>`).join("");
+    el("setupCurrentWeight").innerHTML = WEIGHTS.map(w => `<option value="${w}">${w}</option>`).join("");
+    el("setupStartWeight").value = String(setupDraft.startWeight);
+    el("setupCurrentWeight").value = String(setupDraft.currentWeight);
+    el("bulkPaste").value = "";
+    renderSetupGrid();
+    el("setupBackdrop").classList.add("show");
+    setTimeout(() => el("setupTeam1").focus(), 0);
+  }
+
+  function closeSetup(){
+    el("setupBackdrop").classList.remove("show");
+    setupDraft = null;
+  }
+
+  function renderSetupGrid(){
+    el("setupTh1").textContent = (el("setupTeam1").value || "TEAM1").toUpperCase();
+    el("setupTh2").textContent = (el("setupTeam2").value || "TEAM2").toUpperCase();
+
+    el("setupLineupBody").innerHTML = WEIGHTS.map(w => {
+      const row = setupDraft.lineup[w] || { team1:"", team2:"" };
+      return `
+        <tr data-weight="${w}">
+          <td class="wcol">${w}</td>
+          <td><input class="cellInput" data-team="team1" value="${escapeAttr(row.team1)}" placeholder="Wrestler" /></td>
+          <td><input class="cellInput" data-team="team2" value="${escapeAttr(row.team2)}" placeholder="Wrestler" /></td>
+        </tr>
+      `;
+    }).join("");
+
+    el("setupLineupBody").querySelectorAll("input.cellInput").forEach(inp => {
+      inp.addEventListener("input", () => {
+        const tr = inp.closest("tr");
+        const w = parseInt(tr.getAttribute("data-weight"),10);
+        const team = inp.getAttribute("data-team");
+        if(!setupDraft.lineup[w]) setupDraft.lineup[w] = { team1:"", team2:"" };
+        setupDraft.lineup[w][team] = inp.value;
+      });
+    });
+  }
+
+  function applySetup(){
+    if(!setupDraft) return;
+    setupDraft.team1Name = el("setupTeam1").value.trim() || "TEAM 1";
+    setupDraft.team2Name = el("setupTeam2").value.trim() || "TEAM 2";
+    setupDraft.startWeight = parseInt(el("setupStartWeight").value,10);
+    setupDraft.currentWeight = parseInt(el("setupCurrentWeight").value,10);
+
+    state.setup = setupDraft;
+    setupDraft = null;
+    el("setupBackdrop").classList.remove("show");
+
+    if(!WEIGHTS.includes(state.setup.currentWeight)) state.setup.currentWeight = 106;
+    resetMatchForNewWeight();
+    scheduleSave();
+    render();
+  }
+
+  function applyBulk(){
+    const txt = el("bulkPaste").value.trim();
+    if(!txt) return;
+    const lines = txt.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    for(const line of lines){
+      const parts = line.includes(",") ? line.split(",").map(x=>x.trim()) : line.split(/\s+/);
+      const w = parseInt(parts[0],10);
+      if(!WEIGHTS.includes(w)) continue;
+      const name1 = (parts[1] ?? "").trim();
+      const name2 = (parts.slice(2).join(" ") ?? "").trim();
+      if(!setupDraft.lineup[w]) setupDraft.lineup[w] = { team1:"", team2:"" };
+      if(name1) setupDraft.lineup[w].team1 = name1;
+      if(name2) setupDraft.lineup[w].team2 = name2;
+    }
+    renderSetupGrid();
+  }
+
+  // Config modal
+  function openConfig(){
+    const s = state.config.scoring;
+    el("cfgTD").value = s.TD; el("cfgE1").value = s.E1; el("cfgR2").value = s.R2; el("cfgP1").value = s.P1;
+    el("cfgNF2").value = s.NF2; el("cfgNF3").value = s.NF3; el("cfgNF4").value = s.NF4;
+
+    const tp = state.config.teamPoints;
+    el("cfgDecision").value = tp.Decision; el("cfgMajor").value = tp.Major; el("cfgTech").value = tp.Tech; el("cfgFall").value = tp.Fall;
+
+    el("cfgBlood").value = fmtMs(state.config.auxDefaults.bloodMs);
+    el("cfgInjury").value = fmtMs(state.config.auxDefaults.injuryMs);
+
+    const ts = { ...DEFAULT_TEXT_SIZES, ...(state.config.textSizes || {}) };
+    el("cfgClockSize").value = ts.clock;
+    el("cfgTeamScoreSize").value = ts.teamScore;
+    el("cfgMatchScoreSize").value = ts.matchScore;
+    el("cfgBoutInfoSize").value = ts.boutInfo;
+    el("cfgMiniTimerSize").value = ts.miniTimers;
+    el("cfgPopupTimerSize").value = ts.popupTimers;
+    el("cfgLabelSize").value = ts.labels;
+    el("cfgHintLabelSize").value = ts.hintLabels;
+
+    el("configBackdrop").classList.add("show");
+  }
+  function closeConfig(){
+    applyTextSizesFromConfig();
+    el("configBackdrop").classList.remove("show");
+  }
+
+  function saveConfig(){
+    state.config.scoring = {
+      TD: parseInt(el("cfgTD").value,10)||0,
+      E1: parseInt(el("cfgE1").value,10)||0,
+      R2: parseInt(el("cfgR2").value,10)||0,
+      P1: parseInt(el("cfgP1").value,10)||0,
+      NF2: parseInt(el("cfgNF2").value,10)||0,
+      NF3: parseInt(el("cfgNF3").value,10)||0,
+      NF4: parseInt(el("cfgNF4").value,10)||0
+    };
+    state.config.teamPoints = {
+      Decision: parseInt(el("cfgDecision").value,10)||0,
+      Major: parseInt(el("cfgMajor").value,10)||0,
+      Tech: parseInt(el("cfgTech").value,10)||0,
+      Fall: parseInt(el("cfgFall").value,10)||0
+    };
+    state.config.auxDefaults = {
+      bloodMs: parseMmSs(el("cfgBlood").value, state.config.auxDefaults.bloodMs),
+      injuryMs: parseMmSs(el("cfgInjury").value, state.config.auxDefaults.injuryMs),
+    };
+    state.config.textSizes = {
+      clock: parseFloat(el("cfgClockSize").value) || DEFAULT_TEXT_SIZES.clock,
+      teamScore: parseFloat(el("cfgTeamScoreSize").value) || DEFAULT_TEXT_SIZES.teamScore,
+      matchScore: parseFloat(el("cfgMatchScoreSize").value) || DEFAULT_TEXT_SIZES.matchScore,
+      boutInfo: parseFloat(el("cfgBoutInfoSize").value) || DEFAULT_TEXT_SIZES.boutInfo,
+      miniTimers: parseFloat(el("cfgMiniTimerSize").value) || DEFAULT_TEXT_SIZES.miniTimers,
+      popupTimers: parseFloat(el("cfgPopupTimerSize").value) || DEFAULT_TEXT_SIZES.popupTimers,
+      labels: parseFloat(el("cfgLabelSize").value) || DEFAULT_TEXT_SIZES.labels,
+      hintLabels: parseFloat(el("cfgHintLabelSize").value) || DEFAULT_TEXT_SIZES.hintLabels
+    };
+    applyTextSizesFromConfig();
+
+    scheduleSave();
+    render();
+    closeConfig();
+  }
+
+  function restoreDefaults(){
+    state.config = defaultConfig();
+    applyTextSizesFromConfig();
+    scheduleSave();
+    render();
+    openConfig();
+  }
+
+  // Export/Import (setup+config only)
+  function exportConfigOnly(){
+    const payload = { exportedAt: new Date().toISOString(), setup: deepCopy(state.setup), config: deepCopy(state.config) };
+    const txt = JSON.stringify(payload, null, 2);
+    navigator.clipboard?.writeText(txt).catch(()=>{});
+    const blob = new Blob([txt], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `wrestling_scoreboard_config_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function openImportConfig(){
+    el("importText").value = "";
+    el("importBackdrop").classList.add("show");
+    el("importText").focus();
+  }
+  function closeImport(){ el("importBackdrop").classList.remove("show"); }
+
+  function doImportConfig(){
+    const txt = el("importText").value.trim();
+    if(!txt){ alert("Paste JSON first."); return; }
+    let obj;
+    try{ obj = JSON.parse(txt); } catch(e){ alert("Invalid JSON."); return; }
+    if(!obj || typeof obj !== "object" || !obj.setup || !obj.config){
+      alert("Config JSON must include setup and config.");
+      return;
+    }
+    const fresh = initialState();
+    state.setup = { ...fresh.setup, ...obj.setup, lineup: { ...fresh.setup.lineup, ...((obj.setup||{}).lineup||{}) } };
+    state.config = {
+      ...fresh.config, ...obj.config,
+      scoring: { ...fresh.config.scoring, ...((obj.config||{}).scoring||{}) },
+      teamPoints: { ...fresh.config.teamPoints, ...((obj.config||{}).teamPoints||{}) },
+      auxDefaults: { ...fresh.config.auxDefaults, ...((obj.config||{}).auxDefaults||{}) },
+      textSizes: { ...fresh.config.textSizes, ...((obj.config||{}).textSizes||{}) }
+    };
+
+    if(!WEIGHTS.includes(state.setup.currentWeight)) state.setup.currentWeight = 106;
+    if(!WEIGHTS.includes(state.setup.startWeight)) state.setup.startWeight = state.setup.currentWeight;
+
+    resetMatchForNewWeight();
+    applyTextSizesFromConfig();
+    scheduleSave();
+    render();
+    closeImport();
+  }
+
+  // Scoring (one delegated handler prevents duplicate logging)
+  function applyMatchKey(side, key, label){
+    const pts = parseInt(state.config.scoring[key],10) || 0;
+    if(side === "team1") state.match.team1Match = clamp0(state.match.team1Match + pts);
+    else state.match.team2Match = clamp0(state.match.team2Match + pts);
+    logScoreEvent(side, label);
+    scheduleSave(true);
+    render();
+  }
+  function matchPlusMinus(side, delta){
+    if(side === "team1") state.match.team1Match = clamp0(state.match.team1Match + delta);
+    else state.match.team2Match = clamp0(state.match.team2Match + delta);
+    logScoreEvent(side, delta > 0 ? "+1" : "−1");
+    scheduleSave(true);
+    render();
+  }
+  function adjustTeam(team, delta){
+    if(team === "team1") state.match.team1Team = clamp0(state.match.team1Team + delta);
+    else state.match.team2Team = clamp0(state.match.team2Team + delta);
+    scheduleSave(true);
+    render();
+  }
+  function applyTeamPoints(team, type){
+    const pts = parseInt(state.config.teamPoints[type],10) || 0;
+    if(team === "team1") state.match.team1Team = clamp0(state.match.team1Team + pts);
+    else state.match.team2Team = clamp0(state.match.team2Team + pts);
+    scheduleSave(true);
+    render();
+  }
+
+  function resetBout(){
+    if(!confirmMove("Reset bout")) return;
+    clearScoreLog();
+    resetMatchForNewWeight();
+    scheduleSave();
+    render();
+  }
+  function resetMatch(){
+    if(!confirmFullReset()) return;
+    clearScoreLog();
+    resetMatchForNewWeight();
+    state.match.team1Team = 0;
+    state.match.team2Team = 0;
+    state.setup.team1Name = "";
+    state.setup.team2Name = "";
+    state.setup.lineup = defaultLineup();
+    if(setupDraft){
+      setupDraft.team1Name = "";
+      setupDraft.team2Name = "";
+      setupDraft.lineup = defaultLineup();
+      el("setupTeam1").value = "";
+      el("setupTeam2").value = "";
+      renderSetupGrid();
+    }
+    scheduleSave();
+    render();
+  }
+
+  function render(){
+    el("team1NameTop").textContent = (state.setup.team1Name || "TEAM 1").toUpperCase();
+    el("team2NameTop").textContent = (state.setup.team2Name || "TEAM 2").toUpperCase();
+
+    el("team1TeamScoreTop").textContent = String(state.match.team1Team);
+    el("team2TeamScoreTop").textContent = String(state.match.team2Team);
+
+    const row = state.setup.lineup[state.setup.currentWeight] || { team1:"", team2:"" };
+    el("team1WrestlerName").textContent = row.team1 ? row.team1 : "Wrestler";
+    el("team2WrestlerName").textContent = row.team2 ? row.team2 : "Wrestler";
+
+    el("team1MatchScore").textContent = String(state.match.team1Match);
+    el("team2MatchScore").textContent = String(state.match.team2Match);
+
+    el("mainClock").textContent = fmtMs(state.match.remainingMs);
+    el("periodBig").textContent = PERIODS[state.match.periodIndex]?.label ?? "1";
+    el("weightBig").textContent = String(state.setup.currentWeight);
+
+    renderAuxTimers();
+    renderLog();
+    scheduleSave(true);
+  }
+
+  function clearScoreLog(addStart = false){
+    state.scoreLog.items = [];
+    if(addStart){
+      logStartMatch();
+      return;
+    }
+    scheduleSave();
+    renderLog();
+  }
+
+  // INIT
+  loadSaved();
+  applyTextSizesFromConfig();
+  renderMatchButtons();
+  if(state.scoreLog.items.length === 0) logStartMatch();
+  render();
+
+  // top buttons
+  el("btnFullscreen").addEventListener("click", async () => {
+    if(!document.fullscreenElement){
+      await document.documentElement.requestFullscreen().catch(()=>{});
+    }
+  });
+  el("btnSetup").addEventListener("click", openSetup);
+  el("btnConfig").addEventListener("click", openConfig);
+  el("btnExportConfig").addEventListener("click", exportConfigOnly);
+  el("btnImportConfig").addEventListener("click", openImportConfig);
+  el("btnResetBout").addEventListener("click", resetBout);
+  el("btnResetMatch").addEventListener("click", resetMatch);
+
+  el("btnPrevMatch").addEventListener("click", gotoPrevMatch);
+  el("btnNextMatch").addEventListener("click", gotoNextMatch);
+  el("btnSetTime").addEventListener("click", setMainTimePrompt);
+
+  el("btnPeriodDown").addEventListener("click", periodDown);
+  el("btnPeriodUp").addEventListener("click", periodUp);
+
+  el("clockBox").addEventListener("click", toggleMainClock);
+
+  // mini timers click -> stop main clock and open overlay
+  document.querySelectorAll("[data-timer]").forEach(card => {
+    card.addEventListener("click", () => openBigTimer(card.getAttribute("data-timer")));
+  });
+
+  el("btnClearLog").addEventListener("click", () => {
+    clearScoreLog(true);
+  });
+
+  // Setup modal
+  el("btnCloseSetup").addEventListener("click", closeSetup);
+  el("btnSetupCancel").addEventListener("click", closeSetup);
+  el("setupBackdrop").addEventListener("click", (e) => { if(e.target === el("setupBackdrop")) closeSetup(); });
+
+  el("setupTeam1").addEventListener("input", () => { if(setupDraft){ setupDraft.team1Name = el("setupTeam1").value; renderSetupGrid(); } });
+  el("setupTeam2").addEventListener("input", () => { if(setupDraft){ setupDraft.team2Name = el("setupTeam2").value; renderSetupGrid(); } });
+  el("setupStartWeight").addEventListener("change", () => { if(setupDraft) setupDraft.startWeight = parseInt(el("setupStartWeight").value,10); });
+  el("setupCurrentWeight").addEventListener("change", () => { if(setupDraft) setupDraft.currentWeight = parseInt(el("setupCurrentWeight").value,10); });
+
+  el("btnSetupApply").addEventListener("click", applySetup);
+  el("btnApplyBulk").addEventListener("click", applyBulk);
+
+  // Config modal
+  el("btnCloseConfig").addEventListener("click", closeConfig);
+  el("configBackdrop").addEventListener("click", (e) => { if(e.target === el("configBackdrop")) closeConfig(); });
+  el("btnSaveConfig").addEventListener("click", saveConfig);
+  el("btnConfigDefaults").addEventListener("click", restoreDefaults);
+  [
+    "cfgClockSize","cfgTeamScoreSize","cfgMatchScoreSize","cfgBoutInfoSize",
+    "cfgMiniTimerSize","cfgPopupTimerSize","cfgLabelSize","cfgHintLabelSize"
+  ].forEach(id => {
+    el(id).addEventListener("input", applyTextSizesFromInputs);
+  });
+
+  // Import modal
+  el("btnCloseImport").addEventListener("click", closeImport);
+  el("importBackdrop").addEventListener("click", (e) => { if(e.target === el("importBackdrop")) closeImport(); });
+  el("btnDoImport").addEventListener("click", doImportConfig);
+
+  // Big timer modal
+  el("btnBigTimerClose").addEventListener("click", closeBigTimer);
+  el("bigTimerBackdrop").addEventListener("click", (e) => { if(e.target === el("bigTimerBackdrop")) closeBigTimer(); });
+  el("btnBigTimerStartStop").addEventListener("click", toggleBigTimer);
+  el("btnBigTimerSet").addEventListener("click", setBigTimerPrompt);
+
+  // Keyboard: only space toggles match clock (ignore typing)
+  window.addEventListener("keydown", (e) => {
+    const isTyping = ["INPUT","TEXTAREA","SELECT"].includes(document.activeElement?.tagName);
+    if(isTyping) return;
+    if(e.code === "Space"){
+      e.preventDefault();
+      toggleMainClock();
+    }
+  });
+
+  // ONE delegated click handler for scoring buttons (prevents duplicate log entries)
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    if(!(t instanceof HTMLElement)) return;
+
+    if(t.matches("[data-action='teampts']")){
+      applyTeamPoints(t.getAttribute("data-team"), t.getAttribute("data-type"));
+      return;
+    }
+    if(t.matches("[data-action='teamadj']")){
+      adjustTeam(t.getAttribute("data-team"), parseInt(t.getAttribute("data-delta"),10));
+      return;
+    }
+    if(t.matches("[data-action='matchadj']")){
+      matchPlusMinus(t.getAttribute("data-side"), parseInt(t.getAttribute("data-delta"),10));
+      return;
+    }
+    if(t.matches("[data-action='matchkey']")){
+      applyMatchKey(t.getAttribute("data-side"), t.getAttribute("data-key"), t.getAttribute("data-label"));
+      return;
+    }
+  });
+})();
+</script>
+</body>
+</html>
